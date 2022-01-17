@@ -9,7 +9,7 @@ use std::task::Poll;
 pub async fn main() {
     let mut stream = StreamFut::new(|x| Box::pin(sleep(x)));
     let next = stream.next().await;
-    dbg!(next);
+    dbg!(next.unwrap());
 }
 
 #[pin_project]

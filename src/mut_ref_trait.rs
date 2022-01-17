@@ -12,7 +12,7 @@ pub async fn main() {
     let mut sleeper = Sleeper;
     let mut stream = StreamFut::new(&mut sleeper);
     let next = stream.next().await;
-    dbg!(next);
+    dbg!(next.unwrap());
 }
 
 #[async_trait]
@@ -40,7 +40,11 @@ impl<'a, F, Fut> StreamFut<'a, F, Fut> {
     }
 }
 
-impl<'a, F> Stream for StreamFut<'a, F, BoxFuture<'a, bool>>
+// I think the problem is we can no longer Copy the &'a F reference from
+// StreamFut, so we now need our reference to the StreamFut itself to live
+// as long as the future, but we only get it for the anonymous lifetime
+// in Pin<&mut Self>.
+impl<'a, F> Stream for StreamFut<'_, F, BoxFuture<'a, bool>>
 where
     F: Async,
 {
@@ -57,8 +61,37 @@ where
                 this.fut.set(None);
                 break Some(item);
             } else {
-                // Error: `cannot infer an appropriate lifetime for lifetime parameter 'pin.`
-                // this.fut.set(Some( this.f.run(3) ));
+/// error[E0495]: cannot infer an appropriate lifetime for lifetime parameter `'a` due to conflicting requirements
+///   --> src/mut_ref_trait.rs:57:29
+///    |
+/// 57 |         let mut this = self.project();
+///    |                             ^^^^^^^
+///    |
+/// note: first, the lifetime cannot outlive the lifetime `'_` as defined here...
+///   --> src/mut_ref_trait.rs:47:34
+///    |
+/// 47 | impl<'a, F> Stream for StreamFut<'_, F, BoxFuture<'a, bool>>
+///    |                                  ^^
+/// note: ...so that the types are compatible
+///   --> src/mut_ref_trait.rs:57:29
+///    |
+/// 57 |         let mut this = self.project();
+///    |                             ^^^^^^^
+///    = note: expected `Pin<&mut mut_ref_trait::StreamFut<'_, F, Pin<Box<(dyn futures::Future<Output = bool> + std::marker::Send + 'a)>>>>`
+///               found `Pin<&mut mut_ref_trait::StreamFut<'_, F, Pin<Box<(dyn futures::Future<Output = bool> + std::marker::Send + 'a)>>>>`
+/// note: but, the lifetime must be valid for the lifetime `'a` as defined here...
+///   --> src/mut_ref_trait.rs:47:6
+///    |
+/// 47 | impl<'a, F> Stream for StreamFut<'_, F, BoxFuture<'a, bool>>
+///    |      ^^
+/// note: ...so that the expression is assignable
+///   --> src/mut_ref_trait.rs:65:30
+///    |
+/// 65 |                 this.fut.set(Some( this.f.run(3) ));
+///    |                              ^^^^^^^^^^^^^^^^^^^^^
+///    = note: expected `Option<Pin<Box<(dyn futures::Future<Output = bool> + std::marker::Send + 'a)>>>`
+///               found `Option<Pin<Box<dyn futures::Future<Output = bool> + std::marker::Send>>>`
+                this.fut.set(Some( this.f.run(3) ));
                 todo!()
             }
         })

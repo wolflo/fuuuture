@@ -9,37 +9,42 @@ use pin_project::pin_project;
 use std::task::Poll;
 
 pub async fn main() {
-    let mut stream = StreamFut::new(Sleeper);
+    let mut sleeper = Sleeper;
+    let mut stream = StreamFut::new(&mut sleeper);
     let next = stream.next().await;
     dbg!(next.unwrap());
 }
 
 #[async_trait]
 pub trait Async {
-    async fn run(&self, s: u64) -> bool;
+    async fn run(&mut self, s: u64) -> bool;
 }
 struct Sleeper;
 #[async_trait]
 impl Async for Sleeper {
-    async fn run(&self, s: u64) -> bool {
+    async fn run(&mut self, s: u64) -> bool {
         tokio::time::sleep(tokio::time::Duration::from_secs(s)).await;
         true
     }
 }
 
 #[pin_project]
-pub struct StreamFut<F, Fut> {
-    f: F,
+pub struct StreamFut<'a, F, Fut> {
+    f: &'a mut F,
     #[pin]
     fut: Option<Fut>,
 }
-impl<F, Fut> StreamFut<F, Fut> {
-    pub fn new(f: F) -> Self {
+impl<'a, F, Fut> StreamFut<'a, F, Fut> {
+    pub fn new(f: &'a mut F) -> Self {
         Self { f, fut: None }
     }
 }
 
-impl<F> Stream for StreamFut<F, BoxFuture<'_, bool>>
+// I think the problem is we can no longer Copy the &'a F reference from
+// StreamFut, so we now need our reference to the StreamFut itself to live
+// as long as the future, but we only get it for the anonymous lifetime
+// in Pin<&mut Self>.
+impl<'a, F> Stream for StreamFut<'_, F, BoxFuture<'a, bool>>
 where
     F: Async,
 {
@@ -57,11 +62,6 @@ where
                 break Some(item);
             } else {
                 // Error: `cannot infer an appropriate lifetime for lifetime parameter 'pin.`
-                // The future returned by f.run now captures the lifetime of
-                // its reference to f, and that reference cannot outlive the
-                // anonymous lifetime Pin<&mut Self> that we have access to
-                // from poll_next(). We can't hold on to our future once we
-                // return from this function.
                 // this.fut.set(Some( this.f.run(3) ));
                 todo!()
             }

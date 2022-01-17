@@ -12,7 +12,7 @@ pub async fn main() {
     let mut sleeper = Sleeper;
     let mut stream = StreamFut::new(&mut sleeper);
     let next = stream.next().await;
-    dbg!(next);
+    dbg!(next.unwrap());
 }
 
 #[async_trait]
@@ -61,7 +61,6 @@ where
             } else {
                 let f = this.f.take().unwrap();
                 this.fut.set(Some( f.run(3) ));
-                todo!()
             }
         })
     }

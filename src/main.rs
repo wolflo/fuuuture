@@ -1,3 +1,6 @@
+#![feature(unboxed_closures)]
+#![feature(fn_traits)]
+
 use async_trait::async_trait;
 use futures::{
     future::BoxFuture,
@@ -12,12 +15,14 @@ mod owned_trait;
 mod ref_trait;
 mod mut_ref_trait;
 mod taker;
+mod toy;
 
 #[tokio::main]
 async fn main() {
     closure::main().await;
-    owned_trait::main().await;
+    // owned_trait::main().await;
     ref_trait::main().await;
-    mut_ref_trait::main().await;
+    // mut_ref_trait::main().await;
     taker::main().await;
+    toy::main().await;
 }

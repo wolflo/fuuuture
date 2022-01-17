@@ -11,7 +11,7 @@ use std::task::Poll;
 pub async fn main() {
     let mut stream = StreamFut::new(&Sleeper);
     let next = stream.next().await;
-    dbg!(next);
+    dbg!(next.unwrap());
 }
 
 #[async_trait]
